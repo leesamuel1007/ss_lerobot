@@ -1,0 +1,96 @@
+{
+    "env": {
+        "robot": {
+            "type": "unitree_g1",
+            "port": "192.168.123.104",
+            "id": "unitree",
+            "cameras": {
+                "": {
+                    "type": "opencv", # CHANGE
+                    "index_or_path": 0, # CHANGE
+                    "height": 480,
+                    "width": 640,
+                    "fps": 30
+                }
+            }
+        },
+        "teleop": {
+            "type": "spacemouse",
+            "use_gripper": false
+        },
+        "processor": {
+            "control_mode": "spacemouse",
+            "observation": {
+                "display_cameras": false,
+                "add_joint_velocity_to_observation": true,
+                "add_current_to_observation": false,
+                "add_ee_pose_to_observation": true
+            },
+            "image_preprocessing": {
+                "crop_params_dict": {
+                  "observation.images.side": [49, 189, 262, 305],
+                  "observation.images.front": [49, 189, 262, 305]
+                },
+                "resize_size": [128, 128]
+            },
+            "gripper": {
+                "use_gripper": false,
+                "gripper_penalty": -0.02,
+                "gripper_penalty_in_reward": false
+            },
+            "reset": {
+                "fixed_reset_joint_positions": [
+                    0.2051459699869156,
+                    0.6284786462783813,
+                    0.059297945350408554,
+                    0.06668023020029068,
+                    0.2786571979522705,
+                    -1.0399240255355835,
+                    -0.22080887854099274
+                ],
+                "reset_time_s": 2.5,
+                "control_time_s": 60.0,
+                "terminate_on_success": true
+            },
+            "inverse_kinematics": {
+                "urdf_path": "../assets/robots/unitree_g1/unitree_g1.urdf",
+                "target_frame_name": "left_wrist_yaw_joint",
+                "end_effector_bounds": {
+                    "min": [
+                        0.195,
+                        -0.065,
+                        0.005
+                    ],
+                    "max": [
+                        0.25,
+                        0.065,
+                        0.1
+                    ]
+                },
+                "end_effector_step_sizes": {
+                    "x": 0.02,
+                    "y": 0.02,
+                    "z": 0.02
+                }
+            },
+            "reward_classifier": {
+                "pretrained_path": "../model/path",
+                "success_threshold": 0.5,
+                "success_reward": 1.0
+            },
+            "max_gripper_pos": 30
+        },
+        "name": "real_unitree_g1",
+        "fps": 10
+    },
+    "dataset": {
+        "repo_id": "aractingi/pick_lift_cube_pipeline_test", # CHANGE
+        "root": null,
+        "task": "",
+        "num_episodes_to_record": 15,
+        "replay_episode": null,
+        "push_to_hub": false
+    },
+    "mode": null,
+    "device": "gpu"
+}

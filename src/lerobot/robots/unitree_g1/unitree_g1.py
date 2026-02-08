@@ -27,8 +27,9 @@ import numpy as np
 from lerobot.cameras.utils import make_cameras_from_configs
 from lerobot.envs.factory import make_env
 from lerobot.processor import RobotAction, RobotObservation
-from lerobot.robots.unitree_g1.g1_utils import G1_29_JointArmIndex, G1_29_JointIndex
+from lerobot.robots.unitree_g1.g1_utils import G1_29_JointArmIndex, G1_29_JointIndex, G1_29_JointHandIndex
 from lerobot.robots.unitree_g1.robot_kinematic_processor import G1_29_ArmIK
+from tests.fixtures.optimizers import model_params
 
 from ..robot import Robot
 from .config_unitree_g1 import UnitreeG1Config
@@ -57,6 +58,11 @@ class IMUState:
     rpy: np.ndarray | None = None  # [roll, pitch, yaw] (rad)
     temperature: float | None = None  # IMU temperature
 
+@dataclass
+class PressureSensorState:
+    data: np.ndarray | None = None  # pressure sensor data (12 values)
+    id: int | None = None  # sensor ID
+    # temperature: float | None = None  # pressure sensor temperature
 
 # g1 observation class
 @dataclass
@@ -66,6 +72,15 @@ class G1_29_LowState:  # noqa: N801
     wireless_remote: Any = None  # Raw wireless remote data
     mode_machine: int = 0  # Robot mode
 
+@dataclass
+class HandState:  # noqa: N801
+    motor_state: list[MotorState] = field(default_factory=lambda: [MotorState() for _ in G1_29_JointHandIndex])
+    pressure_sensor_state: list[PressureSensorState] = field(
+        default_factory=lambda: [PressureSensorState() for _ in range(9)]
+    )
+    wireless_remote: Any = None  # Raw wireless remote data
+    mode_machine: int = 0  # Hand mode
+    # temperature: float = 0.0  # Hand temperature
 
 class UnitreeG1(Robot):
     config_class = UnitreeG1Config

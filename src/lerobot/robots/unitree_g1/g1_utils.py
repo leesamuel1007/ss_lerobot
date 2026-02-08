@@ -21,6 +21,15 @@ from enum import IntEnum
 NUM_MOTORS = 29
 
 
+class G1_29_JointHandIndex(IntEnum):
+    kThumb0 = 0
+    kThumb1 = 1
+    kThumb2 = 2
+    kMiddle0 = 3
+    kMiddle1 = 4
+    kIndex0 = 5
+    kIndex1 = 6
+
 class G1_29_JointArmIndex(IntEnum):
     # Left arm
     kLeftShoulderPitch = 15

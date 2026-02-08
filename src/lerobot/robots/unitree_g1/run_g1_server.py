@@ -34,19 +34,23 @@ from typing import Any
 import zmq
 from unitree_sdk2py.comm.motion_switcher.motion_switcher_client import MotionSwitcherClient
 from unitree_sdk2py.core.channel import ChannelFactoryInitialize, ChannelPublisher, ChannelSubscriber
-from unitree_sdk2py.idl.default import unitree_hg_msg_dds__LowCmd_
-from unitree_sdk2py.idl.unitree_hg.msg.dds_ import LowCmd_ as hg_LowCmd, LowState_ as hg_LowState
+from unitree_sdk2py.idl.default import unitree_hg_msg_dds__LowCmd_, unitree_hg_msg_dds__HandCmd_
+from unitree_sdk2py.idl.unitree_hg.msg.dds_ import LowCmd_ as hg_LowCmd, LowState_ as hg_LowState, HandState_ as hg_HandState, HandCmd_ as hg_HandCmd
 from unitree_sdk2py.utils.crc import CRC
 
 # DDS topic names follow Unitree SDK naming conventions
 # ruff: noqa: N816
+kTopicHandLeftState = "rt/dex3/left/state"
+kTopicHandRightState = "rt/dex3/right/state"
+kTopicHandLeftCommand = "rt/dex3/left/cmd"
+kTopicHandRightCommand = "rt/dex3/right/cmd"
 kTopicLowCommand_Debug = "rt/lowcmd"  # action to robot
 kTopicLowState = "rt/lowstate"  # observation from robot
 
 LOWCMD_PORT = 6000
 LOWSTATE_PORT = 6001
-NUM_MOTORS = 35
-
+NUM_MOTORS = 29
+NUM_TACTILES = 12
 
 def lowstate_to_dict(msg: hg_LowState) -> dict[str, Any]:
     """Convert LowState SDK message to a JSON-serializable dictionary."""
@@ -62,7 +66,6 @@ def lowstate_to_dict(msg: hg_LowState) -> dict[str, Any]:
                 "temperature": avg_temp,
             }
         )
-
     return {
         "motor_state": motor_states,
         "imu_state": {
@@ -77,6 +80,39 @@ def lowstate_to_dict(msg: hg_LowState) -> dict[str, Any]:
         "mode_machine": int(msg.mode_machine),
     }
 
+def handstate_to_dict(msg: hg_HandState) -> dict[str, Any]:
+    """Convert HandState SDK message to a JSON-serializable dictionary."""
+    motor_states = []
+    pressure_sensor_states = []
+    for i in range(len(msg.motor_state)):
+        motor_states.append(
+            {
+                "q": float(msg.motor_state[i].q),
+                "dq": float(msg.motor_state[i].dq),
+                "tau_est": float(msg.motor_state[i].tau_est),
+                "temperature": float(msg.motor_state[i].temperature),
+            }
+        )
+    for i in range(len(msg.pressure_sensor_state)):
+        pressure_sensor_states.append(
+            {
+                "data": [float(x) for x in msg.pressure_sensor_state[i].data],
+                "id": int(msg.pressure_sensor_state[i].id),
+            }
+        )
+    return {
+        "motor_state": motor_states,
+        "pressure_sensor_state": pressure_sensor_states,
+        "imu_state": {
+            "quaternion": [float(x) for x in msg.imu_state.quaternion],
+            "gyroscope": [float(x) for x in msg.imu_state.gyroscope],
+            "accelerometer": [float(x) for x in msg.imu_state.accelerometer],
+            "rpy": [float(x) for x in msg.imu_state.rpy],
+            "temperature": float(msg.imu_state.temperature),
+        },
+        "wireless_remote": base64.b64encode(bytes(msg.wireless_remote)).decode("ascii"),
+        "mode_machine": int(msg.mode_machine),
+    }
 
 def dict_to_lowcmd(data: dict[str, Any]) -> hg_LowCmd:
     """Convert dictionary back to LowCmd SDK message."""
@@ -94,9 +130,26 @@ def dict_to_lowcmd(data: dict[str, Any]) -> hg_LowCmd:
 
     return cmd
 
+def dict_to_handcmd(data: dict[str, Any]) -> hg_HandCmd:
+    """Convert dictionary back to HandCmd SDK message."""
+    cmd = unitree_hg_msg_dds__HandCmd_()
+    cmd.mode_pr = data.get("mode_pr", 0)
+    cmd.mode_machine = data.get("mode_machine", 0)
+    
+    for i, motor_data in enumerate(data.get("motor_cmd", [])):
+        cmd.motor_cmd[i].mode = motor_data.get("mode", 0)
+        cmd.motor_cmd[i].q = motor_data.get("q", 0.0)
+        cmd.motor_cmd[i].dq = motor_data.get("dq", 0.0)
+        cmd.motor_cmd[i].kp = motor_data.get("kp", 0.0)
+        cmd.motor_cmd[i].kd = motor_data.get("kd", 0.0)
+        cmd.motor_cmd[i].tau = motor_data.get("tau", 0.0)
+    return cmd
+
 
 def state_forward_loop(
     lowstate_sub: ChannelSubscriber,
+    lefthandstate_sub: ChannelSubscriber,
+    righthandstate_sub: ChannelSubscriber,
     lowstate_sock: zmq.Socket,
     state_period: float,
     shutdown_event: threading.Event,

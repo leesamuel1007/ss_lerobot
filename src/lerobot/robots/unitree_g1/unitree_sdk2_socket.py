@@ -16,7 +16,7 @@
 
 import base64
 import json
-from typing import Any
+from typing import Any, List
 
 import zmq
 
@@ -60,16 +60,34 @@ class LowStateMsg:
             self.accelerometer: list[float] = data.get("accelerometer", [0.0, 0.0, 0.0])
             self.rpy: list[float] = data.get("rpy", [0.0, 0.0, 0.0])
             self.temperature: float = data.get("temperature", 0.0)
+    
+    class PressureSensorState:
+        """Pressure sensor state data for a single sensor in the hand."""
+        def __init__(self, data: dict[str, Any]) -> None:
+            self.data: List[float] = data.get("data", [0.0] * 12)
+            self.id: int = data.get("id", -1)
+            # self.temp: int = data.get("temp", 0)
+    
+    class HandState:
+        """Represents the state of one hand (Left or Right)"""
+        def __init__(self, data: dict[str, Any]) -> None:
+            self.motor_state = [LowStateMsg.MotorState(m) for m in data.get("motor_state", [])]
+            self.pressure_sensor_state = [LowStateMsg.PressureSensorState(p) for p in data.get("pressure_sensor_state", [])]
+            self.imu_state = LowStateMsg.IMUState(data.get("imu_state", {}))
 
     def __init__(self, data: dict[str, Any]) -> None:
         """Initialize from deserialized JSON data."""
         self.motor_state = [self.MotorState(m) for m in data.get("motor_state", [])]
         self.imu_state = self.IMUState(data.get("imu_state", {}))
+        
+        # Hand states
+        self.left_hand_state = self.HandState(data.get("left_hand", {}))
+        self.right_hand_state = self.HandState(data.get("right_hand", {}))
+        
         # Decode base64-encoded wireless_remote bytes
         wireless_b64 = data.get("wireless_remote", "")
         self.wireless_remote: bytes = base64.b64decode(wireless_b64) if wireless_b64 else b""
         self.mode_machine: int = data.get("mode_machine", 0)
-
 
 def lowcmd_to_dict(topic: str, msg: Any) -> dict[str, Any]:
     """Convert LowCmd message to a JSON-serializable dictionary."""
